@@ -1,0 +1,1 @@
+URL=https://mesonet.agron.iastate.edu/request/asos/hourlyprecip.phtml?network=NY_ASOS
