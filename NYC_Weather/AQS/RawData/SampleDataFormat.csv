@@ -1,0 +1,2 @@
+State Code,County Code,Site Num,Parameter Code,POC,Latitude,Longitude,Datum,Parameter Name,Date Local,Time Local,Date GMT,Time GMT,Sample Measurement,Units of Measure,MDL,Uncertainty,Qualifier,Method Type,Method Code,Method Name,State Name,County Name,Date of Last Change
+1,73,23,64101,1,33.553056,-86.815,WGS84,Barometric pressure,1/1/2015,0:00,1/1/2015,6:00,1003.2,Millibars,0.7,,,Non-FRM,14,INSTRUMENTAL - BAROMETRIC SENSOR,Alabama,Jefferson,5/26/2015

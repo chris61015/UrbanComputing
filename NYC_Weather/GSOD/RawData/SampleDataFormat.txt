@@ -1,0 +1,2 @@
+  USAF  WBAN YR--MODAHRMN DIR SPD GUS CLG SKC L M H  VSB MW MW MW MW AW AW AW AW W TEMP DEWP    SLP   ALT    STP MAX MIN PCP01 PCP06 PCP24 PCPXX SD
+725030 14732 201407010000 180  13 *** *** SCT * * * 10.0 ** ** ** ** ** ** ** ** *   76   65 1014.2 ***** 1012.9  84  72 ***** ***** ***** ***** ** 
