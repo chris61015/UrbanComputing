@@ -1,13 +1,12 @@
 #-*- coding: utf-8 -*-
+'''Doc String'''
 import math
 import os
-import copy
-import geojson
-import math
-import csv
 import datetime
+import csv
+import geojson
+# import math
 import numpy as np
-from scipy import special, optimize
 
 # Do not include Staten Island in the NYC
 latMin = 40.542981
@@ -116,7 +115,7 @@ def getPOIEntropy(curPath, m, n):
         entropyMatrix = calEntropy(cateList, m, n)
     return entropyMatrix   
 
-def genFeatureGroup(m,n):
+def genWeeklyFeature(m,n):
     feature = {
         'WeekDays':{
             '0000-0400':np.zeros((m, n)),
@@ -136,66 +135,109 @@ def genFeatureGroup(m,n):
         }
     }
     return feature
-def calFrequencyFeature(row, checkInfeature, checkOutfeature, st, et, m ,n):
-   
 
-    if st.weekday() in [0,1,2,3,4]:
-        if 0 <= st.hour and st.hour < 4:
-            gridCoor(checkOutfeature['WeekDays']['0000-0400'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.2)
-        elif 4 <= st.hour and st.hour < 8:
-            gridCoor(checkOutfeature['WeekDays']['0400-0800'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.2)
-        elif 8 <= st.hour and st.hour < 12:
-            gridCoor(checkOutfeature['WeekDays']['0800-1200'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.2)
-        elif 12 <= st.hour and st.hour < 16:
-            gridCoor(checkOutfeature['WeekDays']['1200-1600'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.2)
-        elif 16 <= st.hour and st.hour < 20:
-            gridCoor(checkOutfeature['WeekDays']['1600-2000'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.2)
+def genDailyFeature(m,n):
+    feature = {
+        '0000-0400':np.zeros((m, n)),
+        '0400-0800':np.zeros((m, n)),
+        '0800-1200':np.zeros((m, n)),
+        '1200-1600':np.zeros((m, n)),
+        '1600-2000':np.zeros((m, n)),
+        '2000-2400':np.zeros((m, n))     
+    }
+    return feature
+
+def genDFeatWOLocation():
+    feature = {
+        '0000-0400':{'count':0, 'value':0.0},
+        '0400-0800':{'count':0, 'value':0.0},
+        '0800-1200':{'count':0, 'value':0.0},
+        '1200-1600':{'count':0, 'value':0.0},
+        '1600-2000':{'count':0, 'value':0.0},
+        '2000-2400':{'count':0, 'value':0.0}     
+    }
+    return feature
+
+def calTimePeriodFeature(row, time, lat, lon,  m ,n , *features):
+    for feature in features:
+        if time.weekday() in [0,1,2,3,4]:
+            if 0 <= time.hour and time.hour < 4:
+                gridCoor(feature['WeekDays']['0000-0400'], lat, lon, m, n, 0.2)
+            elif 4 <= time.hour and time.hour < 8:
+                gridCoor(feature['WeekDays']['0400-0800'], lat, lon, m, n, 0.2)
+            elif 8 <= time.hour and time.hour < 12:
+                gridCoor(feature['WeekDays']['0800-1200'], lat, lon, m, n, 0.2)
+            elif 12 <= time.hour and time.hour < 16:
+                gridCoor(feature['WeekDays']['1200-1600'], lat, lon, m, n, 0.2)
+            elif 16 <= time.hour and time.hour < 20:
+                gridCoor(feature['WeekDays']['1600-2000'], lat, lon, m, n, 0.2)
+            else:
+                gridCoor(feature['WeekDays']['2000-2400'], lat, lon, m, n, 0.2)
         else:
-            gridCoor(checkOutfeature['WeekDays']['2000-2400'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.2)
-    else:
-        if 0 <= st.hour and st.hour < 4:
-            gridCoor(checkOutfeature['WeekEnds']['0000-0400'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.5)
-        elif 4 <= st.hour and st.hour < 8:
-            gridCoor(checkOutfeature['WeekEnds']['0400-0800'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.5)
-        elif 8 <= st.hour and st.hour < 12:
-            gridCoor(checkOutfeature['WeekEnds']['0800-1200'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.5)
-        elif 12 <= st.hour and st.hour < 16:
-            gridCoor(checkOutfeature['WeekEnds']['1200-1600'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.5)
-        elif 16 <= st.hour and st.hour < 20:
-            gridCoor(checkOutfeature['WeekEnds']['1600-2000'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.5)
+            if 0 <= time.hour and time.hour < 4:
+                gridCoor(feature['WeekEnds']['0000-0400'], lat, lon, m, n, 0.5)
+            elif 4 <= time.hour and time.hour < 8:
+                gridCoor(feature['WeekEnds']['0400-0800'], lat, lon, m, n, 0.5)
+            elif 8 <= time.hour and time.hour < 12:
+                gridCoor(feature['WeekEnds']['0800-1200'],lat, lon, m, n, 0.5)
+            elif 12 <= time.hour and time.hour < 16:
+                gridCoor(feature['WeekEnds']['1200-1600'], lat, lon, m, n, 0.5)
+            elif 16 <= time.hour and time.hour < 20:
+                gridCoor(feature['WeekEnds']['1600-2000'], lat, lon, m, n, 0.5)
+            else:
+                gridCoor(feature['WeekEnds']['2000-2400'], lat, lon, m, n, 0.5)
+
+def calDailyFeature(row, time, lat, lon,  m ,n , increment ,*features):
+    for feature in features:
+        if 0 <= time.hour and time.hour < 4:
+            gridCoor(feature['0000-0400'], lat, lon, m, n, increment)
+        elif 4 <= time.hour and time.hour < 8:
+            gridCoor(feature['0400-0800'], lat, lon, m, n, increment)
+        elif 8 <= time.hour and time.hour < 12:
+            gridCoor(feature['0800-1200'], lat, lon, m, n, increment)
+        elif 12 <= time.hour and time.hour < 16:
+            gridCoor(feature['1200-1600'], lat, lon, m, n, increment)
+        elif 16 <= time.hour and time.hour < 20:
+            gridCoor(feature['1600-2000'], lat, lon, m, n, increment)
         else:
-            gridCoor(checkOutfeature['WeekEnds']['2000-2400'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.5)
-        
-    if et.weekday() in [0,1,2,3,4]:
-        if 0 <= et.hour and et.hour < 4:
-            gridCoor(checkInfeature['WeekDays']['0000-0400'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.2)
-        elif 4 <= et.hour and et.hour < 8:
-            gridCoor(checkInfeature['WeekDays']['0400-0800'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.2)
-        elif 8 <= et.hour and et.hour < 12:
-            gridCoor(checkInfeature['WeekDays']['0800-1200'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.2)
-        elif 12 <= et.hour and et.hour < 16:
-            gridCoor(checkInfeature['WeekDays']['1200-1600'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.2)
-        elif 16 <= et.hour and et.hour < 20:
-            gridCoor(checkInfeature['WeekDays']['1600-2000'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.2)
-        else:
-            gridCoor(checkInfeature['WeekDays']['2000-2400'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.2)
-    else:
-        if 0 <= et.hour and et.hour < 4:
-            gridCoor(checkInfeature['WeekEnds']['0000-0400'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.5)
-        elif 4 <= et.hour and et.hour < 8:
-            gridCoor(checkInfeature['WeekEnds']['0400-0800'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.5)
-        elif 8 <= et.hour and et.hour < 12:
-            gridCoor(checkInfeature['WeekEnds']['0800-1200'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.5)
-        elif 12 <= et.hour and et.hour < 16:
-            gridCoor(checkInfeature['WeekEnds']['1200-1600'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.5)
-        elif 16 <= et.hour and et.hour < 20:
-            gridCoor(checkInfeature['WeekEnds']['1600-2000'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.5)
-        else:
-            gridCoor(checkInfeature['WeekEnds']['2000-2400'], float(row['start station latitude']), float(row['start station longitude']), m, n, 0.5)
+            gridCoor(feature['2000-2400'], lat, lon, m, n, increment)
+
+def calDFeatWOLocation(time,lat, lon, m,n ,increment ,*features):
+    col = int(distance(latMax,lon,latMax,lonMin) / gridLength)
+    row = int(distance(lat,lonMin,latMax,lonMin) / gridWidth)
+    if (row>= 0 and row<m and col>=0 and col<n):
+        for feature in features:
+            if 0 <= time.hour and time.hour < 4:
+                feature['0000-0400']['value'] += increment
+                feature['0000-0400']['count'] += 1
+            elif 4 <= time.hour and time.hour < 8:
+                feature['0400-0800']['value']  += increment
+                feature['0400-0800']['count'] += 1
+            elif 8 <= time.hour and time.hour < 12:
+                feature['0800-1200']['value']  += increment
+                feature['0800-1200']['count'] += 1
+            elif 12 <= time.hour and time.hour < 16:
+                feature['1200-1600']['value']  += increment
+                feature['1200-1600']['count'] += 1
+            elif 16 <= time.hour and time.hour < 20:
+                feature['1600-2000']['value']  += increment
+                feature['1600-2000']['count'] += 1
+            else:
+                feature['2000-2400']['value']  += increment
+                feature['2000-2400']['count'] += 1 
+    else :
+        print('out of boundary')   
+
+def calAvgValue(data):
+    
+    for dateKeys, dataValues in data.items():
+        for timeKeys, timeValues in dataValues.items(): 
+            if timeValues['count'] != 0:
+                timeValues['value'] /= timeValues['count']                    
 
 def getBikeFrequency(curPath,m,n):
-    checkInfeature = genFeatureGroup(m,n)
-    checkOutfeature = genFeatureGroup(m,n)
+    checkInfeature = genWeeklyFeature(m,n)
+    checkOutfeature = genWeeklyFeature(m,n)
     folderPath = os.path.join(curPath, 'NYC_Bike', 'RawData')
     for file in os.listdir(folderPath):
         if '.csv' not in file:
@@ -215,20 +257,154 @@ def getBikeFrequency(curPath,m,n):
                     except Exception as e:
                         st = datetime.datetime.strptime(row['starttime'],'%m/%d/%Y %H:%M')
                         et = datetime.datetime.strptime(row['stoptime'],'%m/%d/%Y %H:%M')
-
-                calFrequencyFeature(row,checkInfeature, checkOutfeature,st, et, m ,n)
+                lat = float(row['start station latitude'])
+                lon = float(row['start station longitude'])
+                calTimePeriodFeature(row, st, lat, lon, m ,n, checkOutfeature)
+                calTimePeriodFeature(row, et, lat, lon, m ,n, checkInfeature)
    
     return checkInfeature, checkOutfeature
+
+
+def getNoiseDense(curPath, m, n):
+    dateDict = dict()
+    
+    filePath = os.path.join(curPath, 'NYC_Noise', 'NYC_NoiseData.csv')
+    with open(filePath) as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            time = datetime.datetime.strptime(row['Created Date'],'%m/%d/%Y %I:%M:%S %p')
+            date = time.strftime('%Y-%m-%d')
+            if date not in dateDict.keys():
+                dateDict[date] = genDailyFeature(m,n)
+            if row['Latitude'] != '' and row['Longitude']!='':
+                lat = float(row['Latitude'])
+                lon = float(row['Longitude'])
+                calDailyFeature(row, time, lat, lon, m ,n , 1, dateDict[date])
+    return  dateDict           
+                
+def getPressureFeature(curPath, m, n):
+    dateDict = dict()
+    dirPath = os.path.join(curPath,'NYC_Weather','AQS')
+    for fileName in os.listdir(dirPath):
+        if 'hourly_PRESS' in fileName:
+            filePath = os.path.join(dirPath, fileName)
+            with open(filePath) as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    t = datetime.datetime.strptime(row['Date Local'],'%Y-%m-%d')
+                    date = t.strftime('%Y-%m-%d')
+                    time = datetime.datetime.strptime(row['Time Local'],'%H:%M')
+                    if date not in dateDict.keys():
+                        dateDict[date] = genDFeatWOLocation()
+                    lat = float(row['Latitude'])
+                    lon = float(row['Longitude'])
+                    # there are three stations in AQS Pressure Data Set
+                    calDFeatWOLocation(time, lat, lon, m,n,float(row['Sample Measurement']),dateDict[date])
+        else:
+            continue
+    calAvgValue(dateDict)
+    return dateDict
+
+def getRelativeHumidityFeature(curPath, m, n):
+    dateDict = dict()
+    dirPath = os.path.join(curPath,'NYC_Weather','AQS')
+    for fileName in os.listdir(dirPath):
+        if 'hourly_RH_DP' in fileName:
+            filePath = os.path.join(dirPath, fileName)
+            with open(filePath) as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    t = datetime.datetime.strptime(row['Date Local'],'%Y-%m-%d')
+                    date = t.strftime('%Y-%m-%d')
+                    time = datetime.datetime.strptime(row['Time Local'],'%H:%M')
+                    if date not in dateDict.keys():
+                        dateDict[date] = genDFeatWOLocation()
+                    lat = float(row['Latitude'])
+                    lon = float(row['Longitude'])
+                    # there are three stations in AQS RH Data Set
+                    calDFeatWOLocation(time, lat, lon, m,n,float(row['Sample Measurement']),dateDict[date])
+        else:
+            continue
+    calAvgValue(dateDict)
+    return dateDict
+
+def getWindFeature(curPath, m, n):
+    windSpeedDict = dict()
+    windDirectDict = dict()
+    dirPath = os.path.join(curPath,'NYC_Weather','AQS')
+    for fileName in os.listdir(dirPath):
+        if 'hourly_WIND' in fileName:
+            filePath = os.path.join(dirPath, fileName)
+            with open(filePath) as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    t = datetime.datetime.strptime(row['Date Local'],'%Y-%m-%d')
+                    date = t.strftime('%Y-%m-%d')
+                    time = datetime.datetime.strptime(row['Time Local'],'%H:%M')
+                    if 'Wind Speed' in row['Parameter Name']:
+                        if date not in windSpeedDict.keys():
+                            windSpeedDict[date] = genDFeatWOLocation()
+
+                        lat = float(row['Latitude'])
+                        lon = float(row['Longitude'])
+                        calDFeatWOLocation(time, lat, lon, m,n,float(row['Sample Measurement']),windSpeedDict[date])
+                    elif 'Wind Direction' in row['Parameter Name']:
+                        if date not in windDirectDict.keys():
+                            windDirectDict[date] = genDFeatWOLocation()
+
+                        lat = float(row['Latitude'])
+                        lon = float(row['Longitude'])
+                        calDFeatWOLocation(time, lat, lon, m,n,float(row['Sample Measurement']),windDirectDict[date])  
+                    else:
+                        print ("Error")       
+        else:
+            continue
+    calAvgValue(windSpeedDict)
+    calAvgValue(windDirectDict)
+    return windSpeedDict, windDirectDict
+
+def getTempFeature(curPath, m, n):
+    dateDict = dict()
+    dirPath = os.path.join(curPath,'NYC_Weather','AQS')
+    for fileName in os.listdir(dirPath):
+        if 'hourly_TEMP' in fileName:
+            filePath = os.path.join(dirPath, fileName)
+            with open(filePath) as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    t = datetime.datetime.strptime(row['Date Local'],'%Y-%m-%d')
+                    date = t.strftime('%Y-%m-%d')
+                    time = datetime.datetime.strptime(row['Time Local'],'%H:%M')
+                    if date not in dateDict.keys():
+                        dateDict[date] = genDFeatWOLocation()
+                    lat = float(row['Latitude'])
+                    lon = float(row['Longitude'])
+                    calDFeatWOLocation(time, lat, lon, m,n,float(row['Sample Measurement']),dateDict[date])
+        else:
+            continue
+    calAvgValue(dateDict)
+    return dateDict
+
 
 def main():
     m,n = numOfGrid()
     curPath = os.getcwd()    
 
-    POIDense = getPOIDensity(curPath,m,n)
-    POIEntropy = getPOIEntropy(curPath, m, n)
+    # POIDense = getPOIDensity(curPath,m,n)
+    # POIEntropy = getPOIEntropy(curPath, m, n)
 
-    BikeDense = getBikeDensity(curPath,m,n)
-    BikeCheckInFreq, BikeCheckOutFreq = getBikeFrequency(curPath,m,n)
+    # BikeDense = getBikeDensity(curPath,m,n)
+    # BikeCheckInFreq, BikeCheckOutFreq = getBikeFrequency(curPath,m,n)
+
+    # NoiseDense = getNoiseDense(curPath, m, n)
+
+    # PressureFeature = getPressureFeature(curPath, m, n)
+    # RHFeature = getRelativeHumidityFeature(curPath, m, n)
+
+    # WindSpeedFeature, WindDirectFeature = getWindFeature(curPath, m, n)
+    TempFreature = getTempFeature(curPath, m, n)
+    print(TempFreature)
+    # PM2_5Freature = getPM2_5Feature(curPath, m, n)
 
 if __name__=="__main__":
     main()
