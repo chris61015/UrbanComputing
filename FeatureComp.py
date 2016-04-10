@@ -202,34 +202,39 @@ def calDailyFeature(row, time, lat, lon,  m ,n , increment ,*features):
         else:
             gridCoor(feature['2000-2400'], lat, lon, m, n, increment)
 
-def calDFeatWOLocation(time,lat, lon, m,n ,increment ,*features):
-    col = int(distance(latMax,lon,latMax,lonMin) / gridLength)
-    row = int(distance(lat,lonMin,latMax,lonMin) / gridWidth)
-    if (row>= 0 and row<m and col>=0 and col<n):
-        for feature in features:
-            if 0 <= time.hour and time.hour < 4:
-                feature['0000-0400']['value'] += increment
-                feature['0000-0400']['count'] += 1
-            elif 4 <= time.hour and time.hour < 8:
-                feature['0400-0800']['value']  += increment
-                feature['0400-0800']['count'] += 1
-            elif 8 <= time.hour and time.hour < 12:
-                feature['0800-1200']['value']  += increment
-                feature['0800-1200']['count'] += 1
-            elif 12 <= time.hour and time.hour < 16:
-                feature['1200-1600']['value']  += increment
-                feature['1200-1600']['count'] += 1
-            elif 16 <= time.hour and time.hour < 20:
-                feature['1600-2000']['value']  += increment
-                feature['1600-2000']['count'] += 1
-            else:
-                feature['2000-2400']['value']  += increment
-                feature['2000-2400']['count'] += 1 
-    else :
-        print('out of boundary')   
+def countFeature(time, increment, features):
+    for feature in features:
+        if 0 <= time.hour and time.hour < 4:
+            feature['0000-0400']['value'] += increment
+            feature['0000-0400']['count'] += 1
+        elif 4 <= time.hour and time.hour < 8:
+            feature['0400-0800']['value']  += increment
+            feature['0400-0800']['count'] += 1
+        elif 8 <= time.hour and time.hour < 12:
+            feature['0800-1200']['value']  += increment
+            feature['0800-1200']['count'] += 1
+        elif 12 <= time.hour and time.hour < 16:
+            feature['1200-1600']['value']  += increment
+            feature['1200-1600']['count'] += 1
+        elif 16 <= time.hour and time.hour < 20:
+            feature['1600-2000']['value']  += increment
+            feature['1600-2000']['count'] += 1
+        else:
+            feature['2000-2400']['value']  += increment
+            feature['2000-2400']['count'] += 1 
+
+def calDFeatWOLocation(time, m,n ,increment,lat = None,lon = None,*features):
+    if (lat != None and lon != None):
+        col = int(distance(latMax,lon,latMax,lonMin) / gridLength)
+        row = int(distance(lat,lonMin,latMax,lonMin) / gridWidth)
+        if (row>= 0 and row<m and col>=0 and col<n):
+            countFeature(time, increment, features)
+        else :
+            print('out of boundary')   
+    else:
+        countFeature(time, increment, features)
 
 def calAvgValue(data):
-    
     for dateKeys, dataValues in data.items():
         for timeKeys, timeValues in dataValues.items(): 
             if timeValues['count'] != 0:
@@ -299,10 +304,56 @@ def getPressureFeature(curPath, m, n):
                     lat = float(row['Latitude'])
                     lon = float(row['Longitude'])
                     # there are three stations in AQS Pressure Data Set
-                    calDFeatWOLocation(time, lat, lon, m,n,float(row['Sample Measurement']),dateDict[date])
+                    calDFeatWOLocation(time, m,n,float(row['Sample Measurement']),lat,lon,dateDict[date])
         else:
             continue
+
+    # GSOD Data
+    dirPath = os.path.join(curPath,'NYC_Weather','GSOD','RawData')
+    for fileName in os.listdir(dirPath):
+        if 'RawData' in fileName:
+            filePath = os.path.join(dirPath, fileName)
+            with open(filePath) as file:
+                f = file.readlines()
+                del[f[0]]
+                for row in f:
+                    for i in range(1,5):
+                        row = row.replace('  ',' ')
+                    cols = row.split(' ')
+
+                    t = datetime.datetime.strptime(cols[2],'%Y%m%d%H%M')
+                    date = t.strftime('%Y-%m-%d')
+                    if cols[25] != '******':
+                        if date not in dateDict.keys():
+                            dateDict[date] = genDFeatWOLocation()
+                        calDFeatWOLocation(t,m,n,float(cols[25]),None,None,dateDict[date]) 
+
+    #QCLCD Data        
+    dirPath = os.path.join(curPath,'NYC_Weather','QCLCD','RawData')
+    for fileName in os.listdir(dirPath):
+        if '.csv' in fileName:
+            filePath = os.path.join(dirPath, fileName)
+            with open(filePath) as file:
+                f = file.readlines()
+                del[f[0:7]]
+                for row in f:
+                    cols = row.split(',')
+
+                    if len(cols)!=1:
+
+                        t = datetime.datetime.strptime(cols[1],'%Y%m%d')
+                        time = datetime.datetime.strptime(cols[2],'%M%S')
+                        date = t.strftime('%Y-%m-%d')
+
+                        if date not in dateDict.keys():
+                            dateDict[date] = genDFeatWOLocation()
+                        if cols[30] != 'M':
+                            #Unit: (INCHES IN HUNDREDTHS)
+                            # 1 inch of mercury =33.86 millibars
+                            calDFeatWOLocation(time,m,n,float(cols[30]) * 33.86,None,None,dateDict[date]) 
+
     calAvgValue(dateDict)
+
     return dateDict
 
 def getRelativeHumidityFeature(curPath, m, n):
@@ -322,9 +373,30 @@ def getRelativeHumidityFeature(curPath, m, n):
                     lat = float(row['Latitude'])
                     lon = float(row['Longitude'])
                     # there are three stations in AQS RH Data Set
-                    calDFeatWOLocation(time, lat, lon, m,n,float(row['Sample Measurement']),dateDict[date])
-        else:
-            continue
+                    calDFeatWOLocation(time,m,n,float(row['Sample Measurement']),lat,lon,dateDict[date])
+
+    #QCLCD Data        
+    dirPath = os.path.join(curPath,'NYC_Weather','QCLCD','RawData')
+    for fileName in os.listdir(dirPath):
+        if '.csv' in fileName:
+            filePath = os.path.join(dirPath, fileName)
+            with open(filePath) as file:
+                f = file.readlines()
+                del[f[0:7]]
+                for row in f:
+                    cols = row.split(',')
+
+                    if len(cols)!=1:
+
+                        t = datetime.datetime.strptime(cols[1],'%Y%m%d')
+                        time = datetime.datetime.strptime(cols[2],'%M%S')
+                        date = t.strftime('%Y-%m-%d')
+
+                        if date not in dateDict.keys():
+                            dateDict[date] = genDFeatWOLocation()
+                        if cols[22] != 'M':
+                            calDFeatWOLocation(time,m,n,float(cols[22]),None,None,dateDict[date]) 
+
     calAvgValue(dateDict)
     return dateDict
 
@@ -347,18 +419,76 @@ def getWindFeature(curPath, m, n):
 
                         lat = float(row['Latitude'])
                         lon = float(row['Longitude'])
-                        calDFeatWOLocation(time, lat, lon, m,n,float(row['Sample Measurement']),windSpeedDict[date])
+                        calDFeatWOLocation(time,m,n,float(row['Sample Measurement']),lat,lon,windSpeedDict[date])
                     elif 'Wind Direction' in row['Parameter Name']:
                         if date not in windDirectDict.keys():
                             windDirectDict[date] = genDFeatWOLocation()
 
                         lat = float(row['Latitude'])
                         lon = float(row['Longitude'])
-                        calDFeatWOLocation(time, lat, lon, m,n,float(row['Sample Measurement']),windDirectDict[date])  
+                        calDFeatWOLocation(time,m,n,float(row['Sample Measurement']),lat,lon,windDirectDict[date])  
                     else:
                         print ("Error")       
         else:
             continue
+    
+    # GSOD Data
+    dirPath = os.path.join(curPath,'NYC_Weather','GSOD','RawData')
+    for fileName in os.listdir(dirPath):
+        if 'RawData' in fileName:
+            filePath = os.path.join(dirPath, fileName)
+            with open(filePath) as file:
+                f = file.readlines()
+                del[f[0]]
+                for row in f:
+                    for i in range(1,5):
+                        row = row.replace('  ',' ')
+                    cols = row.split(' ')
+
+                    t = datetime.datetime.strptime(cols[2],'%Y%m%d%H%M')
+                    date = t.strftime('%Y-%m-%d')
+                    if cols[3] != '***' and cols[3] != '990':
+                        if date not in windDirectDict.keys():
+                            windDirectDict[date] = genDFeatWOLocation()
+                        calDFeatWOLocation(t,m,n,float(cols[3]),None,None,windDirectDict[date]) 
+
+                    if cols[4] != '***':
+                        if date not in windSpeedDict.keys():
+                            windSpeedDict[date] = genDFeatWOLocation()
+
+                        # 1 knot =1.15077945 miles per hour
+                        calDFeatWOLocation(t,m,n,float(cols[4]) / 1.15077945,None,None,windSpeedDict[date]) 
+
+    #QCLCD Data        
+    dirPath = os.path.join(curPath,'NYC_Weather','QCLCD','RawData')
+    for fileName in os.listdir(dirPath):
+        if '.csv' in fileName:
+            filePath = os.path.join(dirPath, fileName)
+            with open(filePath) as file:
+                f = file.readlines()
+                del[f[0:7]]
+                for row in f:
+                    cols = row.split(',')
+
+                    if len(cols)!=1:
+
+                        t = datetime.datetime.strptime(cols[1],'%Y%m%d')
+                        time = datetime.datetime.strptime(cols[2],'%M%S')
+                        date = t.strftime('%Y-%m-%d')
+
+                        #WindSpeed
+                        if date not in windSpeedDict.keys():
+                            windSpeedDict[date] = genDFeatWOLocation()
+                        if cols[24] != 'M':
+                            # 1 knot =1.15077945 miles per hour
+                            calDFeatWOLocation(time,m,n,float(cols[24]) / 1.15077945,None,None,windSpeedDict[date])    
+
+                        #WindDirection
+                        if date not in windDirectDict.keys():
+                            windDirectDict[date] = genDFeatWOLocation()
+                        if cols[26]!= 'M' and cols[26]!='VR ':
+                            calDFeatWOLocation(time,m,n,float(cols[26]),None,None,windDirectDict[date])    
+
     calAvgValue(windSpeedDict)
     calAvgValue(windDirectDict)
     return windSpeedDict, windDirectDict
@@ -379,12 +509,122 @@ def getTempFeature(curPath, m, n):
                         dateDict[date] = genDFeatWOLocation()
                     lat = float(row['Latitude'])
                     lon = float(row['Longitude'])
-                    calDFeatWOLocation(time, lat, lon, m,n,float(row['Sample Measurement']),dateDict[date])
+                    calDFeatWOLocation(time,m,n,float(row['Sample Measurement']),lat, lon,dateDict[date])
         else:
             continue
+    
+     # GSOD Data
+    dirPath = os.path.join(curPath,'NYC_Weather','GSOD','RawData')
+    for fileName in os.listdir(dirPath):
+        if 'RawData' in fileName:
+            filePath = os.path.join(dirPath, fileName)
+            with open(filePath) as file:
+                f = file.readlines()
+                del[f[0]]
+                for row in f:
+                    for i in range(1,5):
+                        row = row.replace('  ',' ')
+                    cols = row.split(' ')
+
+                    t = datetime.datetime.strptime(cols[2],'%Y%m%d%H%M')
+                    date = t.strftime('%Y-%m-%d')
+                    if cols[21] != '****':
+                        if date not in dateDict.keys():
+                            dateDict[date] = genDFeatWOLocation()
+                        calDFeatWOLocation(t,m,n,float(cols[21]),None,None,dateDict[date]) 
+        else:
+            continue     
+
+    #QCLCD Data        
+    dirPath = os.path.join(curPath,'NYC_Weather','QCLCD','RawData')
+    for fileName in os.listdir(dirPath):
+        if '.csv' in fileName:
+            filePath = os.path.join(dirPath, fileName)
+            with open(filePath) as file:
+                f = file.readlines()
+                del[f[0:7]]
+                for row in f:
+                    cols = row.split(',')
+
+                    if len(cols)!=1:
+
+                        t = datetime.datetime.strptime(cols[1],'%Y%m%d')
+                        time = datetime.datetime.strptime(cols[2],'%M%S')
+                        date = t.strftime('%Y-%m-%d')
+
+                        if date not in dateDict.keys():
+                            dateDict[date] = genDFeatWOLocation()
+                        # DryBulbFarenheit
+                        calDFeatWOLocation(time,m,n,float(cols[10]),None,None,dateDict[date]) 
+       
     calAvgValue(dateDict)
+
     return dateDict
 
+def getPrecipFeature(curPath, m, n):
+    dateDict = dict()
+    dirPath = os.path.join(curPath,'NYC_Weather','ASOS','RawData')
+    for fileName in os.listdir(dirPath):
+        if 'Precipitation' in fileName:
+            filePath = os.path.join(dirPath, fileName)
+            with open(filePath) as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    t = datetime.datetime.strptime(row['valid'],'%Y-%m-%d %H:%M')
+                    date = t.strftime('%Y-%m-%d')
+                    if date not in dateDict.keys():
+                        dateDict[date] = genDFeatWOLocation()
+                    calDFeatWOLocation(t,m,n,float(row['precip_in']), None, None, dateDict[date])
+        else:
+            continue
+
+    # GSOD Data
+    dirPath = os.path.join(curPath,'NYC_Weather','GSOD','RawData')
+    for fileName in os.listdir(dirPath):
+        if 'RawData' in fileName:
+            filePath = os.path.join(dirPath, fileName)
+            with open(filePath) as file:
+                f = file.readlines()
+                del[f[0]]
+                for row in f:
+                    for i in range(1,5):
+                        row = row.replace('  ',' ')
+                    cols = row.split(' ')
+
+                    t = datetime.datetime.strptime(cols[2],'%Y%m%d%H%M')
+                    date = t.strftime('%Y-%m-%d')
+                    if cols[-5] != '*****' and cols[-5] != '***':
+                        if date not in dateDict.keys():
+                            dateDict[date] = genDFeatWOLocation()
+                        if (cols[-5] == '0.00T*****' or cols[-5] == '0.00T'):
+                            cols[-5] = 0.00
+                        calDFeatWOLocation(t,m,n,float(cols[-5]),None,None,dateDict[date]) 
+
+    #QCLCD Data        
+    dirPath = os.path.join(curPath,'NYC_Weather','QCLCD','RawData')
+    for fileName in os.listdir(dirPath):
+        if '.csv' in fileName:
+            filePath = os.path.join(dirPath, fileName)
+            with open(filePath) as file:
+                f = file.readlines()
+                del[f[0:7]]
+                for row in f:
+                    cols = row.split(',')
+
+                    if len(cols)!=1:
+
+                        t = datetime.datetime.strptime(cols[1],'%Y%m%d')
+                        time = datetime.datetime.strptime(cols[2],'%M%S')
+                        date = t.strftime('%Y-%m-%d')
+
+                        if date not in dateDict.keys():
+                            dateDict[date] = genDFeatWOLocation()
+                        if cols[-4] != 'M' and cols[-4] != ' ':
+                            if 'T' in cols[-4]:
+                                cols[-4] = 0.0
+                            calDFeatWOLocation(time,m,n,float(cols[-4]),None,None,dateDict[date]) 
+    calAvgValue(dateDict)
+    return dateDict
 
 def main():
     m,n = numOfGrid()
@@ -402,8 +642,8 @@ def main():
     # RHFeature = getRelativeHumidityFeature(curPath, m, n)
 
     # WindSpeedFeature, WindDirectFeature = getWindFeature(curPath, m, n)
-    TempFreature = getTempFeature(curPath, m, n)
-    print(TempFreature)
+    # TempFreature = getTempFeature(curPath, m, n)
+    PrecipFeature = getPrecipFeature(curPath, m, n)
     # PM2_5Freature = getPM2_5Feature(curPath, m, n)
 
 if __name__=="__main__":
