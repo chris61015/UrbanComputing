@@ -14,7 +14,9 @@ def genGeoJson(fileName, s):
 
 def main():
 	coordinates = []
-	with open('new york_anon_locationData_newcrawl.txt') as f:
+	curPath = os.getcwd()
+	filePath = os.path.join(curPath, 'RawData','new york_anon_locationData_newcrawl.txt')
+	with open(filePath) as f:
 		content = f.readlines()
 		for line in content:
 			data = line.split(';')[1].strip('*\n()').split(',')
