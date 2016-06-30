@@ -81,13 +81,12 @@ def getBikeDensity(curPath, m, n):
 
 def getPOIDensity(curPath, m, n):
     mlist =  np.zeros((m,n)) #initialize the matrix to 0
-    filePath = os.path.join(curPath, 'NYC_POI', 'RawData', 'new york_anon_locationData_newcrawl.txt')
-    with open(filePath) as f:
-        lines = f.readlines()
-        for line in lines:
-            data = line.split(';')[1].strip('()*').split(',')
-            lat = float(data[0])
-            lon = float(data[1])
+    filePath = os.path.join(curPath, 'NYC_POI', 'NYCVenues.csv')
+    with open(filePath, encoding = 'utf8') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            lat = float(row['lat'])
+            lon = float(row['lon'])
             gridCoor(mlist, lat, lon, m, n, 1)
 
     return mlist  
@@ -108,27 +107,33 @@ def calEntropy(cateList, m, n):
     return rtnlist
 
 def getPOIEntropy(curPath, m, n):
-    filePath = os.path.join(curPath, 'NYC_POI', 'RawData', 'new york_anon_locationData_newcrawl.txt')
-    with open(filePath) as f:
-        lines = f.readlines()
+
+    venueFilePath = os.path.join(curPath,'NYC_POI','NYCVenues.csv')
+
+    with open(venueFilePath,  encoding = 'utf8') as venueFile:
+        reader1 = csv.DictReader(venueFile)
+
         s = set()
-        for line in lines:
-            data = line.split(';')[1].strip('()*').split(',')
-            lat = float(data[0])
-            lon = float(data[1])
-            s = s.union([eval(data[2])])
-            # gridCoor(mlist, lat, lon, m, n, 1)
+        for row in reader1:
+            if row['cat'].strip('\n ') != '':
+                lat = float(row['lat'])
+                lon = float(row['lon'])
+                s = s.union([row['cat']])
+                # gridCoor(mlist, lat, lon, m, n, 1)
+
+    with open(venueFilePath,  encoding = 'utf8') as venueFile:
+        reader2 = csv.DictReader(venueFile)       
 
         cateList = [[dict.fromkeys(s, 0) for col in range(n)] for row in range(m)]
-        for line in lines:
-            data = line.split(';')[1].strip('()*').split(',')
-            lat = float(data[0])
-            lon = float(data[1])
-            cate = eval(data[2])
-            gridCoorCate(cateList, cate, lat, lon, m, n)
-       
+        for row in reader2:
+             if row['cat'].strip('\n ') != '':
+                lat = float(row['lat'])
+                lon = float(row['lon'])
+                cate = row['cat']
+                gridCoorCate(cateList, cate, lat, lon, m, n)
+        
         entropyMatrix = calEntropy(cateList, m, n)
-    return entropyMatrix   
+    return entropyMatrix 
 
 def genWeeklyFeature(m,n):
     feature = {
@@ -823,7 +828,7 @@ def getBikeRentFeature(curPath, m, n):
 
     dirPath = os.path.join(curPath,'NYC_Bike','RawData')
     for fileName in os.listdir(dirPath):
-        if '.csv' in fileName and '2013-07' in fileName:    
+        if '.csv' in fileName:    
             filePath = os.path.join(dirPath, fileName)
             with open(filePath) as csvfile:
                 reader = csv.DictReader(csvfile)
@@ -907,24 +912,23 @@ def countNeighbor(cateDict):
     return neighborDict
 
 def getPOIBikeQuality(curPath,m,n):
-    filePath = os.path.join(curPath, 'NYC_POI', 'RawData', 'new york_anon_locationData_newcrawl.txt')
-    with open(filePath) as f:
-        lines = f.readlines()
-        cateDict = {}
-        for line in lines:
-  
-                id = line.split(';')[0].strip('*')
-                data = line.split(';')[1].strip('()*').split(',')
-                lat = float(data[0])
-                lon = float(data[1])
-                category = eval(data[2])
-                if eval(data[2]) not in cateDict.keys():
-                    cateDict[category] = {id:{'lon':float(data[1]), 'lat':float(data[0]), 'category':category}}
-                else:
-                    cateDict[category].update({id:{'lon':float(data[1]), 'lat':float(data[0]),'category':category}})
 
-        numOfPOI = len(lines)
-        # print (cateDict)
+    venueFilePath = os.path.join(curPath,'NYC_POI','NYCVenues.csv')
+    numOfPOI = 0
+    with open(venueFilePath,  encoding = 'utf8') as venueFile:
+        reader = csv.DictReader(venueFile)
+        cateDict = {}
+        for row in reader:
+            if row['cat'].strip('\n ') != '':
+                numOfPOI+=1
+                id = row['_id']
+                lat = float(row['lat'])
+                lon = float(row['lon'])
+                category = row['cat']
+                if category not in cateDict.keys():
+                    cateDict[category] = {id:{'lon':lon, 'lat':lat, 'category':category}}
+                else:
+                    cateDict[category].update({id:{'lon':lon, 'lat':lat,'category':category}})
 
     jsonFilePath = os.path.join(curPath,'NYC_Bike','bike.json')
     with open(jsonFilePath) as data_file:    
@@ -934,10 +938,10 @@ def getPOIBikeQuality(curPath,m,n):
             bikeDict.update({data['id']:{'lon':float(data['longitude']), 'lat':float(data['latitude']),'category':'bike'}})
         cateDict['bike'] = bikeDict
  
-    Neighbor = countNeighbor(cateDict)  
-    # print(Neighbor)      
+    Neighbor = countNeighbor(cateDict)      
     quality = calQuality(Neighbor, numOfPOI ,bikeData)
 
+    print (quality)
     return quality   
 
 def getCheckInPopFeature(curPath, m, n):
@@ -1078,7 +1082,7 @@ def getTransitionQuality(curPath, m, n):
         cateList = [cateRow.split(',')[0] for cateRow in cateReader]
         venueList = [venueRow.split(',')[0] for venueRow in venueReader]
 
-        for i in range(1,10000):
+        for i in range(1,n):
             nvid = checkInReader[i].split(',')[1]
             mvid = checkInReader[i-1].split(',')[1]
             
@@ -1356,7 +1360,7 @@ def main():
     # transitionQuality = getTransitionQuality(curPath, m, n)
     # open(os.path.join(curPath, "transitionQuality.txt"), 'w', encoding = 'utf8').write(str(transitionQuality))
    
-    genNoiseDataSet(curPath,m,n,NoiseDense,POIDense,POIEntropy,BikeDense,dailyCheckOutfeature, dailyCheckInfeature,PressureFeature, WindSpeedFeature, WindDirectFeature, TempFreature, PM2_5Freature, PM10Freature, checkInPopFeature, checkInTransitDense, checkInIncomingFlow)
+    genNoiseDataSet(curPath,m,n,NoiseDense,POIDense,POIEntropy,BikeDense,dailyCheckOutfeature, dailyCheckInfeature, BikeRentFeature, POIBikeQuality,PressureFeature, RHFeature, WindSpeedFeature, WindDirectFeature, TempFreature, PrecipFeature,PM2_5Freature, PM10Freature, checkInPopFeature, checkInTransitDense, checkInIncomingFlow)
 
 if __name__=="__main__":
     main()

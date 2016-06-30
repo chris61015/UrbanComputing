@@ -1,8 +1,8 @@
 """This script is for crawling Quality Controlled Local Climatological Data (QCLCD) from website"""
 #encoding=utf8
 import os
-import urllib
-import urllib2
+from urllib.request import urlopen, Request
+from urllib.parse import urlencode
 import datetime
 import time
 from bs4 import BeautifulSoup
@@ -23,7 +23,7 @@ def searchPeriod(startTime, endTime):
 def writeFile(path, dic, content):
 	"""Write CSV files to a specified directory"""
 	fileName = '%s_%s_%s.csv' % (dic['state'], dic['callsign'],dic['VARVALUE'][-4:])
-	with open(os.path.join(path,'QCLCD',fileName),'w' )as f:
+	with open(os.path.join(path,'RawData',fileName),'w' )as f:
 		f.writelines(content)
 
 def parseWebsite(url, state, sites, searchStr, path, paramList):
@@ -32,8 +32,9 @@ def parseWebsite(url, state, sites, searchStr, path, paramList):
 		#enter Year-Month selection page for a specific observation site
 		paramList.update(state)
 		paramList.update(site)
-		post_args = urllib.urlencode(paramList)
-		fp = urllib2.urlopen(url, post_args)
+		post_args = urlencode(paramList).encode('utf8')
+		req = Request(url, post_args)
+		fp = urlopen(req)
 		soup = BeautifulSoup(fp, 'html.parser')
 
 		#Make a list of html option tags of specified Year-Month 
@@ -47,8 +48,9 @@ def parseWebsite(url, state, sites, searchStr, path, paramList):
 		for ym in YearMonthList:
 			year_param = paramList.copy()
 			year_param.update(ym)
-			year_args = urllib.urlencode(year_param)
-			ws = urllib2.urlopen(url, year_args)
+			year_args = urlencode(year_param).encode('utf8')
+			year_req = Request(url, year_args)
+			ws = urlopen(year_req)
 			selDayPage = BeautifulSoup(ws, 'html.parser')
 
 			# try to be a nice guy
@@ -58,8 +60,9 @@ def parseWebsite(url, state, sites, searchStr, path, paramList):
 			day_param = year_param.copy()
 			day_param.update({'reqday':'E'})
 			day_param.update({'which':'ASCII Download (Hourly Obs.) (10A)'})
-			day_args = urllib.urlencode(day_param)
-			ds = urllib2.urlopen(url, day_args)
+			day_args = urlencode(day_param).encode('utf8')
+			day_req = Request(url, day_args)
+			ds = urlopen(day_req)
 			dataPage = BeautifulSoup(ds, 'html.parser')
 
 			#write csv file in folder
@@ -72,7 +75,7 @@ if __name__ == '__main__':
 	state = {'state':'NY'}
 	#obeservation sites
 	sites = [{'callsign':'LGA'},{'callsign':'NYC'},{'callsign':'JFK'}]
-	searchStr = searchPeriod('201406','201506')
+	searchStr = searchPeriod('201307','201406')
 
 	path = os.getcwd()
 
